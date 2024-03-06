@@ -23,7 +23,7 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "nghttp3_conn.h"
-
+#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
@@ -1214,7 +1214,7 @@ nghttp3_ssize nghttp3_conn_read_bidi(nghttp3_conn *conn, size_t *pnproc,
   size_t nconsumed = 0;
   int busy = 0;
   size_t len;
-
+  fprintf(stderr, "shikv inside error \n");
   if (stream->flags & NGHTTP3_STREAM_FLAG_SHUT_RD) {
     *pnproc = srclen;
 
@@ -1273,7 +1273,7 @@ nghttp3_ssize nghttp3_conn_read_bidi(nghttp3_conn *conn, size_t *pnproc,
 
       rstate->left = rstate->fr.hd.length = rvint->acc;
       nghttp3_varint_read_state_reset(rvint);
-
+     // std::cerr << "shikv type is\n"<<rstate->fr.hd.type;
       switch (rstate->fr.hd.type) {
       case NGHTTP3_FRAME_DATA:
         rv = nghttp3_stream_transit_rx_http_state(
@@ -1346,7 +1346,23 @@ nghttp3_ssize nghttp3_conn_read_bidi(nghttp3_conn *conn, size_t *pnproc,
       default:
         /* TODO Handle reserved frame type */
         busy = 1;
-        rstate->state = NGHTTP3_REQ_STREAM_STATE_IGN_FRAME;
+                rv = nghttp3_stream_transit_rx_http_state(
+            stream, NGHTTP3_HTTP_EVENT_DATA_BEGIN);
+        if (rv != 0) {
+          return rv;
+        }
+        /* DATA frame might be empty. */
+        if (rstate->left == 0) {
+          rv = nghttp3_stream_transit_rx_http_state(
+              stream, NGHTTP3_HTTP_EVENT_DATA_END);
+          assert(0 == rv);
+
+          nghttp3_stream_read_state_reset(rstate);
+          break;
+        }
+        rstate->state = NGHTTP3_REQ_STREAM_STATE_DATA;
+
+        //rstate->state = NGHTTP3_REQ_STREAM_STATE_IGN_FRAME;
         break;
       }
       break;
